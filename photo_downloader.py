@@ -1,9 +1,11 @@
 import os.path
 from concurrent.futures._base import wait
 from concurrent.futures.thread import ThreadPoolExecutor
+from datetime import datetime
 from typing import Dict, List
 
 import requests
+from dateutil import parser
 
 from google_photos_api import GooglePhotosApi
 
@@ -11,6 +13,11 @@ from google_photos_api import GooglePhotosApi
 class PhotoDownloader:
     def __init__(self, photos_api: GooglePhotosApi):
         self.photos_api = photos_api
+
+    @staticmethod
+    def set_file_last_modified(file_path, dt):
+        dt_epoch = dt.timestamp()
+        os.utime(file_path, (dt_epoch, dt_epoch))
 
     @staticmethod
     def download_photo(download_directory: str, media_item: Dict[str, str]) -> None:
@@ -22,9 +29,15 @@ class PhotoDownloader:
         request = requests.get(url, allow_redirects=True)
         file_name: str = media_item['filename']
         file_path: str = download_directory + file_name
-        creation_time: str = media_item['mediaMetadata']['creationTime']
+        creation_time_resp: str = media_item['mediaMetadata']['creationTime']
+
         print(f"Getting file: {file_name}")
         open(file_path, 'wb').write(request.content)
+        try:
+            creation_time: datetime = parser.parse(creation_time_resp)
+            PhotoDownloader.set_file_last_modified(file_path, creation_time)
+        except Exception as e:
+            print(f"could not modify file {file_path} - {creation_time_resp}")
         print(f"Downloaded file to: {file_path}")
 
     def download_all_photos(self):
