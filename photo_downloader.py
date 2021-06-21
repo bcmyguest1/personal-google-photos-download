@@ -34,18 +34,16 @@ class PhotoDownloader:
         print(f"Getting file: {file_name}")
         open(file_path, 'wb').write(request.content)
         try:
-            creation_time: datetime = parser.parse(creation_time_resp)
-            PhotoDownloader.set_file_last_modified(file_path, creation_time)
+            if len(creation_time_resp) > 0:
+                creation_time: datetime = parser.parse(creation_time_resp)
+                PhotoDownloader.set_file_last_modified(file_path, creation_time)
         except Exception as e:
             print(f"could not modify file {file_path} - {creation_time_resp}")
         print(f"Downloaded file to: {file_path}")
 
     def download_all_photos(self):
         next_page_token: str = None
-        results = self.photos_api.service.mediaItems().list(pageToken=next_page_token).execute()
-
-        media_items: List[Dict[str, str]] = results.get('mediaItems', [])
-        next_page_token = results.get('nextPageToken', None)
+        media_items, next_page_token = self.photos_api.get_paged_media_items(page_token=next_page_token)
 
         if not media_items:
             print('No media_items found.')
@@ -66,7 +64,6 @@ class PhotoDownloader:
                     res = [executor.submit(PhotoDownloader.download_photo, file_dir, media_item) for media_item in media_items]
                     wait(res)
 
-                results = self.photos_api.service.mediaItems().list(pageToken=next_page_token).execute()
-                media_items: List[Dict[str, str]] = results.get('mediaItems', [])
-                next_page_token = results.get('nextPageToken', None)
+                media_items, next_page_token = self.photos_api.get_paged_media_items(page_token=next_page_token)
                 page += 1
+            print("completed")
